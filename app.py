@@ -3,12 +3,15 @@ import pandas as pd
 import numpy as np
 import nltk
 import math
+import matplotlib.pyplot as plt
+from utils import *
 # nltk.download("stopwords")
 # MotsVides = nltk.corpus.stopwords.words('english')
 Porter = nltk.PorterStemmer()
 Lancaster = nltk.LancasterStemmer()
 ExpReg = nltk.RegexpTokenizer('(?:[A-Za-z]\.)+|[A-Za-z]+[\-@]\d+(?:\.\d+)?|\d+[A-Za-z]+|\d+(?:[\.\,]\d+)?%?|\w+(?:[\-/]\w+)*') 
-
+if st.button("rebuild"):
+    build_files()
 def read_data(labels,ty,file):
     data = []
     with open(file,"r") as f:
@@ -18,7 +21,6 @@ def read_data(labels,ty,file):
     out = pd.DataFrame(data)
     out.columns = labels
     return out
-dataset = read_data(["N° document","Terme","Fréquence","Poids"],[int , str,int,float],"output/DescripteursSplitLancaster.txt")
 
 dataset ={
     "***TERM per DOCS***" :{
@@ -43,44 +45,29 @@ dataset ={
     }
 }
 
+
 st.toast("welcome to tp RI",icon='👋')
 st.toast("by BENBACHIR Mohamed Amir",icon="❤️")
 st.title("Search engine")
 st.text("tp RI")
 
 # Create a search bar
-search_query = st.text_input("Query")
 
-# Create toggle boxes
-check = st.toggle(
-    "check")
-if check:
-    query = search_query.split()
-    
-    def check_query(query):
-        
-        if len(query)>1:
-            if query[0].upper() in ["AND","OR"]:
-                return False
-            if query[-1].upper() in ["NOT","AND","OR"]:
-                return False
-            for i,j in zip(query[:-1],query[1:]):
-                if i.upper()=="NOT":
-                    if j.upper() in ["NOT" ,"AND","OR"]:
-                        return False
-            if len(query)>2:
-                for j,k in zip(query[1:-1],query[2:]):
-                    if j.upper() in ["AND","OR"]:
-                        if k.upper() in ["AND","OR"]:
-                            return False
-        else:
-            if query[0].upper() in ["NOT","AND","OR"]:
-                return False
-        return True
-    if check_query(query):
-        st.text("valide query")
-    else:
-        st.text("wrong query")
+tp8_querys = st.toggle("tp 8 querys") 
+if tp8_querys:
+    with open("Queries") as f :
+        queries = f.readlines()
+    with open("Judgements") as f:
+        judgements = [[] for i in queries]
+        for i in f:
+            x,y = map(int,i.split())
+            judgements[x-1].append(y)
+    print(judgements)
+    qry_num = st.number_input("query number",1,len(queries),value=1)
+    search_query = st.text_input("Query",value=queries[qry_num-1])
+else:
+    search_query = st.text_input("Query")
+
 
 # Create toggle boxes
 chunking = st.radio(
@@ -109,7 +96,7 @@ if matching == "Probabilistic Model(BM25)":
     B = st.number_input("B",value=0.75)
 
 data = dataset[index][chunking][preprocess]
-
+N = np.max(data["N° document"])
 
 
 # Create check buttons for filtering
@@ -120,10 +107,10 @@ if matching == "Probabilistic Model(BM25)":
     filtered_data = data.copy()
     q = ExpReg.tokenize(search_query)
     # q = [terme for terme in q if terme.lower() not in MotsVides]
-    out = [[i,0] for i in range(1,7)]
-    N = 6
+    out = [[i,0] for i in range(1,N+1)]
+
     avdl = np.sum(filtered_data["Fréquence"])/N
-    for i  in range(1,7):
+    for i  in range(1,N+1):
         temp = filtered_data[filtered_data['N° document'] == i]
         dl = np.sum(temp["Fréquence"])
         for v in q:
@@ -142,13 +129,14 @@ if matching == "Probabilistic Model(BM25)":
             ni = len(temp3)
             out[i-1][1]+=((freq/(freq+K*((1-B)+((B*dl)/avdl))))*(math.log10((N-ni+0.5)/(ni+0.5))))
     out.sort(key = lambda x:x[1],reverse=True)
-    st.dataframe(pd.DataFrame(out,columns=['N° document',"RSV"]))
+    st.session_state.out = pd.DataFrame(out,columns=['N° document',"RSV"])
+    st.session_state.out = st.session_state.out[st.session_state.out["RSV"]!=0]
 elif matching == "Vector Space Model":
     filtered_data = data.copy()
     q = ExpReg.tokenize(search_query)
-    #q = [terme for terme in q if terme.lower() not in MotsVides]
-    out = [[i,0] for i in range(1,7)]
-    for i  in range(1,7):
+    q = [terme for terme in q if terme.lower() not in MotsVides]
+    out = [[i,0] for i in range(1,N+1)]
+    for i  in range(1,N+1):
         temp = filtered_data[filtered_data['N° document'] == i]
         if typeVSM == "Cosine Measure":
 
@@ -172,30 +160,33 @@ elif matching == "Vector Space Model":
     elif typeVSM == "Jaccard Measure":
         out =[[i[0],i[1]/(len(q)+i[2]-i[1])] for i in out]
     out.sort(key = lambda x:x[1],reverse=True)
-    st.dataframe(pd.DataFrame(out,columns=['N° document',"RSV"]))
+    st.session_state.out = pd.DataFrame(out,columns=['N° document',"RSV"])
+    st.session_state.out = st.session_state.out[st.session_state.out["RSV"]!=0]
 elif matching == "Boolean Model":
     filtered_data = data.copy()
     q = ExpReg.tokenize(search_query)
-    q = [i for i in q if str(i).upper() is not "AND"]
-    print(len(q))
-    out = [[i,0] for i in range(1,7)]
-    
-    for i  in range(1,7):
-        temp = filtered_data[filtered_data['N° document'] == i]
+    if check_query(q):
+        nots, opps, values = remove_opp(q)
+        out = [[i,[]] for i in range(1,N+1)]
         
-        for v in q:
-            if preprocess=="***lemmatization***":
-                v = Lancaster.stem(v)
-            else:
-                v = Porter.stem(v)
-            print(v)
-            st.dataframe(temp["Terme"])
-            if v in temp["Terme"]:
-                out[i-1][1]+=1
-                print(out[i-1][1])
-        out[i-1][1] = 1 if len(q)==out[i-1][1] else 0
-    out.sort(key = lambda x:x[1],reverse=True)
-    st.dataframe(pd.DataFrame(out,columns=['N° document',"RSV"]))
+        for i  in range(1,N+1):
+            temp = filtered_data[filtered_data['N° document'] == i]
+            
+            for v in values:
+                if preprocess=="***lemmatization***":
+                    v = Lancaster.stem(v)
+                else:
+                    v = Porter.stem(v)
+                temp2 = temp[temp["Terme"] == v]
+                if len(temp2)>0:
+                    out[i-1][1].append(True)
+                else:
+                    out[i-1][1].append(False)
+            out[i-1][1] = evaluate(nots, opps,out[i-1][1])
+        out.sort(key = lambda x:x[1],reverse=True)
+        st.session_state.out = pd.DataFrame(out,columns=['N° document',"RSV"])
+    else:
+        st.error("wrong query")
 
 filtered_data = data.copy()
 if preprocess=="***lemmatization***":
@@ -216,5 +207,56 @@ else:
 if options:
     filtered_data = filtered_data[filtered_data["Terme"].isin(options)]
 
+st.dataframe(st.session_state.out)
 st.dataframe(filtered_data,use_container_width=True)
 
+if tp8_querys:
+    partinate = 0
+    for i in st.session_state.out['N° document']:
+        if i in judgements[qry_num-1]:
+            partinate+=1
+    precision = partinate/len(st.session_state.out['N° document'])
+    st.write(f"p = {precision*100:0.2f} %")
+    partinate_5 = 0
+    out = st.session_state.out['N° document'][:5] if len(st.session_state.out['N° document'])>=5 else st.session_state.out['N° document']
+    for i in out:
+        if i in judgements[qry_num-1]:
+            partinate_5+=1
+    st.write(f"p@5 = {partinate_5/5*100:0.2f} %")
+    partinate_10 = 0
+    out = st.session_state.out['N° document'][:10] if len(st.session_state.out['N° document'])>=10 else st.session_state.out['N° document']
+    for i in out:
+        if i in judgements[qry_num-1]:
+            partinate_10+=1
+    st.write(f"p@10 = {partinate_10/10*100:0.2f} %")
+    recall = partinate /len(judgements[qry_num-1])
+    st.write(f"recall = {recall*100:0.2f} %")
+    f1 = (2*recall*precision)/(recall+precision)
+    st.write(f"f1_score = {f1*100:0.2f} %")
+    # curbe-recall-precision
+    recalls = [0]
+    precisions = [1]
+    ris = [i/10 for i in range(11)]
+    partinate = 0
+    size = 0
+    for i in range(10):
+        size += 1
+        if len(st.session_state.out['N° document'])>i:
+            if st.session_state.out['N° document'][i] in judgements[qry_num-1]:
+                partinate+=1
+        precision = partinate/size
+        recall = partinate /len(judgements[qry_num-1])
+        precisions.append(precision)
+        recalls.append(recall)
+    precisions_ri =[]
+    for i in range(11):
+        precisions_ri.append(max([precisions[j] for j in range(11) if recalls[j]>=ris[i]]))
+    fig,ax = plt.subplots()
+    ax.plot(ris,precisions_ri)
+    ax.set_title('Recall-Precision Curve')
+    ax.set_xlabel('Recall')
+    ax.set_ylabel('Precision')
+    ax.grid(True)
+    ax.legend()
+    print(recalls,precisions)
+    st.pyplot(fig)
