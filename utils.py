@@ -8,14 +8,14 @@ MotsVides = nltk.corpus.stopwords.words('english')
 def saveDesc(docs,tfidf,fname):
     with open(fname,"w") as f:
         for name,FreqDist in docs.items():
-            ndoc =name[1] # get the number of doc 
+            ndoc = name # get the number of doc 
             for i in dict(FreqDist).keys():
                 f.write(f"{ndoc} {i} {FreqDist[i]} {tfidf[name][i]}\n")
 
 def saveinvers(docs,tfidf,fname):
     with open(fname,"w") as f:
         for name,FreqDist in docs.items():
-            ndoc =name[1] # get the number of doc 
+            ndoc = name # get the number of doc 
             for i in dict(FreqDist).keys():
                 f.write(f"{i} {ndoc} {FreqDist[i]} {tfidf[name][i]}\n")
 def cleanerSplitPorter(text):
@@ -71,12 +71,28 @@ def wordcounter(docs):
                         dictOfWord[i] +=1
     return dictOfWord
 
+def read_folder(path,docs):
+    with open(path) as f:
+        status = 0
+        for line in f.readlines():
+            if status == 0:
+                try:
+                    doc_name = line[:-1].split()[1]
+                except:
+                    print(line)
+                docs[doc_name]=[]
+                status = 1
+            elif status == 1:
+                if "**********" in line:
+                    docs[doc_name] = " ".join(docs[doc_name])
+                    status = 0
+                else:
+                    docs[doc_name].append(line)
 def build_files(path="Collection"):
     docs = dict()
-
     for i in os.listdir(path):
         with open(path+"/"+i,"r") as f:
-            docs[i] = "".join(f.readlines())
+            read_folder(path+"/"+i,docs)
 
     N = len(docs)
 
@@ -87,6 +103,7 @@ def build_files(path="Collection"):
     RegLancasterDict = dict()
 
     for i in docs.keys():
+        print(i)
         SplitPorterDict[i]= cleanerSplitPorter(docs[i])
         RegPorterDict[i]= cleanerRegPorter(docs[i])
         SplitLancasterDict[i]= cleanerSplitLancaster(docs[i])

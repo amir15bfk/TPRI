@@ -11,7 +11,8 @@ Porter = nltk.PorterStemmer()
 Lancaster = nltk.LancasterStemmer()
 ExpReg = nltk.RegexpTokenizer('(?:[A-Za-z]\.)+|[A-Za-z]+[\-@]\d+(?:\.\d+)?|\d+[A-Za-z]+|\d+(?:[\.\,]\d+)?%?|\w+(?:[\-/]\w+)*') 
 if st.button("rebuild"):
-    build_files()
+    path = "lisa"
+    build_files(path)
 def read_data(labels,ty,file):
     data = []
     with open(file,"r") as f:
@@ -126,7 +127,7 @@ if matching == "Probabilistic Model(BM25)":
                 freq= 0
             temp3 = filtered_data[filtered_data["Terme"] == v]
             ni = len(temp3)
-            print(f"doc{i} : {v} {((freq/(freq+K*((1-B)+((B*dl)/avdl))))*(math.log10((N-ni+0.5)/(ni+0.5))))}")
+            
             out[i-1][1]+=((freq/(freq+K*((1-B)+((B*dl)/avdl))))*(math.log10((N-ni+0.5)/(ni+0.5))))
     out.sort(key = lambda x:x[1],reverse=True)
     st.session_state.out = pd.DataFrame(out,columns=['N° document',"RSV"])
@@ -185,6 +186,7 @@ elif matching == "Boolean Model":
             out[i-1][1] = evaluate(nots, opps,out[i-1][1])
         out.sort(key = lambda x:x[1],reverse=True)
         st.session_state.out = pd.DataFrame(out,columns=['N° document',"RSV"])
+        st.session_state.out = st.session_state.out[st.session_state.out["RSV"]]
     else:
         st.error("wrong query")
 
