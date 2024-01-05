@@ -62,7 +62,6 @@ if tp8_querys:
         for i in f:
             x,y = map(int,i.split())
             judgements[x-1].append(y)
-    print(judgements)
     qry_num = st.number_input("query number",1,len(queries),value=1)
     search_query = st.text_input("Query",value=queries[qry_num-1])
 else:
@@ -110,23 +109,24 @@ if matching == "Probabilistic Model(BM25)":
     out = [[i,0] for i in range(1,N+1)]
 
     avdl = np.sum(filtered_data["Fréquence"])/N
+    # print("avdl :",avdl)
     for i  in range(1,N+1):
         temp = filtered_data[filtered_data['N° document'] == i]
         dl = np.sum(temp["Fréquence"])
+        # print(f"dl {i}  :{dl}")
         for v in q:
             if preprocess=="***lemmatization***":
                 v = Lancaster.stem(v)
             else:
                 v = Porter.stem(v)
             temp2 = temp[temp["Terme"] == v]["Fréquence"]
-            print(temp2)
             if len(temp2)>0:
                 freq = np.sum(temp2)
             else:
                 freq= 0
-            print("freq =",freq)
             temp3 = filtered_data[filtered_data["Terme"] == v]
             ni = len(temp3)
+            print(f"doc{i} : {v} {((freq/(freq+K*((1-B)+((B*dl)/avdl))))*(math.log10((N-ni+0.5)/(ni+0.5))))}")
             out[i-1][1]+=((freq/(freq+K*((1-B)+((B*dl)/avdl))))*(math.log10((N-ni+0.5)/(ni+0.5))))
     out.sort(key = lambda x:x[1],reverse=True)
     st.session_state.out = pd.DataFrame(out,columns=['N° document',"RSV"])
@@ -258,5 +258,4 @@ if tp8_querys:
     ax.set_ylabel('Precision')
     ax.grid(True)
     ax.legend()
-    print(recalls,precisions)
     st.pyplot(fig)
