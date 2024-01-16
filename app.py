@@ -7,6 +7,8 @@ import matplotlib.pyplot as plt
 from utils import *
 # nltk.download("stopwords")
 # MotsVides = nltk.corpus.stopwords.words('english')
+if 'stage' not in st.session_state:
+    st.session_state.stage = 0
 Porter = nltk.PorterStemmer()
 Lancaster = nltk.LancasterStemmer()
 ExpReg = nltk.RegexpTokenizer('(?:[A-Za-z]\.)+|[A-Za-z]+[\-@]\d+(?:\.\d+)?|\d+[A-Za-z]+|\d+(?:[\.\,]\d+)?%?|\w+(?:[\-/]\w+)*') 
@@ -15,36 +17,88 @@ if st.button("rebuild"):
     build_files(path)
 def read_data(labels,ty,file):
     data = []
+    freq_by_doc_dict = dict() 
+    poids_seq_by_doc_dict = dict() 
+    poids_by_term_by_doc_dict = dict()
+    freq_by_term_by_doc_dict = dict()
+    ni_by_term = dict()
+    if labels[0][0]=="N":
+        doc_idx = 0
+        term_idx =1
+    else:
+        doc_idx = 1
+        term_idx =0
     with open(file,"r") as f:
         for i in f.readlines():
             line = i.split()
-            data.append([ ty[j](line[j]) for j in range(len(line))])
+            to_add = [ ty[j](line[j]) for j in range(len(line))]
+            data.append(to_add)
+            if freq_by_doc_dict.get(to_add[doc_idx]):
+                freq_by_doc_dict[to_add[doc_idx]]+=to_add[2]
+            else:
+                freq_by_doc_dict[to_add[doc_idx]]=to_add[2]
+            if poids_seq_by_doc_dict.get(to_add[doc_idx]):
+                poids_seq_by_doc_dict[to_add[doc_idx]]+=to_add[3]**2
+            else:
+                poids_seq_by_doc_dict[to_add[doc_idx]]=to_add[3]**2
+            
+            if freq_by_term_by_doc_dict.get(to_add[doc_idx]):
+                if freq_by_term_by_doc_dict.get(to_add[doc_idx]).get(to_add[term_idx]):
+                    freq_by_term_by_doc_dict[to_add[doc_idx]][to_add[term_idx]]+=to_add[2]
+                else:
+                    freq_by_term_by_doc_dict[to_add[doc_idx]][to_add[term_idx]]=to_add[2]
+            else:
+                freq_by_term_by_doc_dict[to_add[doc_idx]]={to_add[term_idx]:to_add[2]}
+
+            if poids_by_term_by_doc_dict.get(to_add[doc_idx]):
+                if poids_by_term_by_doc_dict.get(to_add[doc_idx]).get(to_add[term_idx]):
+                    poids_by_term_by_doc_dict[to_add[doc_idx]][to_add[term_idx]]+=to_add[3]
+                else:
+                    poids_by_term_by_doc_dict[to_add[doc_idx]][to_add[term_idx]]=to_add[3]
+            else:
+                poids_by_term_by_doc_dict[to_add[doc_idx]]={to_add[term_idx]:to_add[3]}
+
+            if ni_by_term.get(to_add[term_idx]):
+                ni_by_term[to_add[term_idx]][to_add[doc_idx]]=1
+            else:
+                ni_by_term[to_add[term_idx]]={to_add[doc_idx]:1}
+    
+
+                
+
     out = pd.DataFrame(data)
     out.columns = labels
-    return out
+    print("done")
+    for i in ni_by_term.keys():
+        ni_by_term[i]= len(ni_by_term[i].values())
+    return out,freq_by_doc_dict,freq_by_term_by_doc_dict,poids_by_term_by_doc_dict,ni_by_term,poids_seq_by_doc_dict
 
-dataset ={
-    "***TERM per DOCS***" :{
-        "***Split***":{
-            "***lemmatization***":read_data(["N° document","Terme","Fréquence","Poids"],[int , str,int,float],"output/DescripteursSplitLancaster.txt"),
-            "***stemming***":read_data(["N° document","Terme","Fréquence","Poids"],[int , str,int,float],"output/DescripteursSplitPorter.txt")
-        },
-        "***Tokenization***":{
-            "***lemmatization***":read_data(["N° document","Terme","Fréquence","Poids"],[int , str,int,float],"output/DescripteursTokenLancaster.txt"),
-            "***stemming***":read_data(["N° document","Terme","Fréquence","Poids"],[int , str,int,float],"output/DescripteursTokenPorter.txt")
+if st.session_state.stage == 0:
+    
+    with st.spinner('data loading...'):
+        st.session_state.dataset ={
+            "***TERM per DOCS***" :{
+                "***Split***":{
+                    "***lemmatization***":read_data(["N° document","Terme","Fréquence","Poids"],[int , str,int,float],"output/DescripteursSplitLancaster.txt"),
+                    "***stemming***":read_data(["N° document","Terme","Fréquence","Poids"],[int , str,int,float],"output/DescripteursSplitPorter.txt")
+                },
+                "***Tokenization***":{
+                    "***lemmatization***":read_data(["N° document","Terme","Fréquence","Poids"],[int , str,int,float],"output/DescripteursTokenLancaster.txt"),
+                    "***stemming***":read_data(["N° document","Terme","Fréquence","Poids"],[int , str,int,float],"output/DescripteursTokenPorter.txt")
+                }
+            },
+            "***DOCS par TERM***" :{
+                "***Split***":{
+                    "***lemmatization***":read_data(["Terme","N° document","Fréquence","Poids"],[str , int,int,float],"output/InverseSplitLancaster.txt"),
+                    "***stemming***":read_data(["Terme","N° document","Fréquence","Poids"],[str , int,int,float],"output/InverseSplitPorter.txt")
+                },
+                "***Tokenization***":{
+                    "***lemmatization***":read_data(["Terme","N° document","Fréquence","Poids"],[str , int,int,float],"output/InverseTokenLancaster.txt"),
+                    "***stemming***":read_data(["Terme","N° document","Fréquence","Poids"],[str , int,int,float],"output/InverseTokenPorter.txt")
+                }
+            }
         }
-    },
-    "***DOCS par TERM***" :{
-        "***Split***":{
-            "***lemmatization***":read_data(["Terme","N° document","Fréquence","Poids"],[str , int,int,float],"output/InverseSplitLancaster.txt"),
-            "***stemming***":read_data(["Terme","N° document","Fréquence","Poids"],[str , int,int,float],"output/InverseSplitPorter.txt")
-        },
-        "***Tokenization***":{
-            "***lemmatization***":read_data(["Terme","N° document","Fréquence","Poids"],[str , int,int,float],"output/InverseTokenLancaster.txt"),
-            "***stemming***":read_data(["Terme","N° document","Fréquence","Poids"],[str , int,int,float],"output/InverseTokenPorter.txt")
-        }
-    }
-}
+    st.session_state.stage = 1
 
 
 st.toast("welcome to tp RI",icon='👋')
@@ -94,8 +148,8 @@ if matching == "Vector Space Model":
 if matching == "Probabilistic Model(BM25)":
     K = st.number_input("K",value=1.5)
     B = st.number_input("B",value=0.75)
-
-data = dataset[index][chunking][preprocess]
+with st.spinner('data loading...'):
+    data,freq_by_doc_dict,freq_by_term_by_doc_dict,poids_by_term_by_doc_dict,ni_by_term,poids_seq_by_doc_dict = st.session_state.dataset[index][chunking][preprocess]
 N = np.max(data["N° document"])
 
 
@@ -106,29 +160,34 @@ options = st.multiselect("Filter by Category", data["Terme"].unique())
 if matching == "Probabilistic Model(BM25)":
     filtered_data = data.copy()
     q = ExpReg.tokenize(search_query)
+    if preprocess=="***lemmatization***":
+        q = [Lancaster.stem(v) for v in q]
+    else:
+        q = [Porter.stem(v) for v in q]
     # q = [terme for terme in q if terme.lower() not in MotsVides]
     out = [[i,0] for i in range(1,N+1)]
 
     avdl = np.sum(filtered_data["Fréquence"])/N
     # print("avdl :",avdl)
     for i  in range(1,N+1):
-        temp = filtered_data[filtered_data['N° document'] == i]
-        dl = np.sum(temp["Fréquence"])
-        # print(f"dl {i}  :{dl}")
-        for v in q:
-            if preprocess=="***lemmatization***":
-                v = Lancaster.stem(v)
-            else:
-                v = Porter.stem(v)
-            temp2 = temp[temp["Terme"] == v]["Fréquence"]
-            if len(temp2)>0:
-                freq = np.sum(temp2)
-            else:
-                freq= 0
-            temp3 = filtered_data[filtered_data["Terme"] == v]
-            ni = len(temp3)
-            
-            out[i-1][1]+=((freq/(freq+K*((1-B)+((B*dl)/avdl))))*(math.log10((N-ni+0.5)/(ni+0.5))))
+        if freq_by_doc_dict.get(i):
+            # temp = filtered_data[filtered_data['N° document'] == i]
+            # dl = np.sum(temp["Fréquence"])
+            dl = freq_by_doc_dict[i]
+            temp = freq_by_term_by_doc_dict[i]
+            # print(f"dl {i}  :{dl}")
+            for v in q:
+
+                if temp.get(v):
+                    freq = temp[v]
+                else:
+                    freq= 0
+                if ni_by_term.get(v):
+                    ni = ni_by_term[v]
+                else:
+                    ni = 0
+                
+                out[i-1][1]+=((freq/(freq+K*((1-B)+((B*dl)/avdl))))*(math.log10((N-ni+0.5)/(ni+0.5))))
     out.sort(key = lambda x:x[1],reverse=True)
     st.session_state.out = pd.DataFrame(out,columns=['N° document',"RSV"])
     st.session_state.out = st.session_state.out[st.session_state.out["RSV"]!=0]
@@ -136,24 +195,23 @@ elif matching == "Vector Space Model":
     filtered_data = data.copy()
     q = ExpReg.tokenize(search_query)
     q = [terme for terme in q if terme.lower() not in MotsVides]
-    out = [[i,0] for i in range(1,N+1)]
+    if preprocess=="***lemmatization***":
+        q = [Lancaster.stem(v) for v in q]
+    else:
+        q = [Porter.stem(v) for v in q]
+    out = []
     for i  in range(1,N+1):
-        temp = filtered_data[filtered_data['N° document'] == i]
-        if typeVSM == "Cosine Measure":
-
-            out[i-1].append(np.sqrt(np.sum(temp["Poids"]**2)))
-        elif typeVSM == "Jaccard Measure":
-            out[i-1].append(np.sum(temp["Poids"]**2))
-        
-        for v in q:
-            if preprocess=="***lemmatization***":
-                v = Lancaster.stem(v)
-            else:
-                v = Porter.stem(v)
+        if freq_by_doc_dict.get(i):
+            out.append([i,0])
+            temp = poids_by_term_by_doc_dict[i]
+            if typeVSM == "Cosine Measure":
+                out[-1].append(np.sqrt(poids_seq_by_doc_dict[i]))
+            elif typeVSM == "Jaccard Measure":
+                out[-1].append(poids_seq_by_doc_dict[i])
             
-            temp2 = temp[temp["Terme"] == v]["Poids"]
-            
-            out[i-1][1]+=np.sum(temp2)
+            for v in q:
+                if temp.get(v):
+                    out[-1][1]+=temp[v]
     if typeVSM == "Scaler Product":
         pass
     elif typeVSM == "Cosine Measure":
@@ -166,24 +224,29 @@ elif matching == "Vector Space Model":
 elif matching == "Boolean Model":
     filtered_data = data.copy()
     q = ExpReg.tokenize(search_query)
+    # if preprocess=="***lemmatization***":
+    #     q = [Lancaster.stem(v) for v in q]
+    # else:
+    #     q = [Porter.stem(v) for v in q]
     if check_query(q):
         nots, opps, values = remove_opp(q)
-        out = [[i,[]] for i in range(1,N+1)]
+        if preprocess=="***lemmatization***":
+            values = [Lancaster.stem(v) for v in values]
+        else:
+            values = [Porter.stem(v) for v in values]
+        out = []
         
         for i  in range(1,N+1):
-            temp = filtered_data[filtered_data['N° document'] == i]
-            
-            for v in values:
-                if preprocess=="***lemmatization***":
-                    v = Lancaster.stem(v)
-                else:
-                    v = Porter.stem(v)
-                temp2 = temp[temp["Terme"] == v]
-                if len(temp2)>0:
-                    out[i-1][1].append(True)
-                else:
-                    out[i-1][1].append(False)
-            out[i-1][1] = evaluate(nots, opps,out[i-1][1])
+            if freq_by_doc_dict.get(i):
+                out.append([i,[]])
+                temp = poids_by_term_by_doc_dict[i]
+                
+                for v in values:
+                    if temp.get(v):
+                        out[-1][1].append(True)
+                    else:
+                        out[-1][1].append(False)
+                out[-1][1] = evaluate(nots, opps,out[-1][1])
         out.sort(key = lambda x:x[1],reverse=True)
         st.session_state.out = pd.DataFrame(out,columns=['N° document',"RSV"])
         st.session_state.out = st.session_state.out[st.session_state.out["RSV"]]
@@ -252,7 +315,7 @@ if tp8_querys:
         recalls.append(recall)
     precisions_ri =[]
     for i in range(11):
-        precisions_ri.append(max([precisions[j] for j in range(11) if recalls[j]>=ris[i]]))
+        precisions_ri.append(max([precisions[j] for j in range(11) if recalls[j]>=ris[i]]+[0]))
     fig,ax = plt.subplots()
     ax.plot(ris,precisions_ri)
     ax.set_title('Recall-Precision Curve')
