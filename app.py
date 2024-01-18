@@ -13,7 +13,7 @@ Porter = nltk.PorterStemmer()
 Lancaster = nltk.LancasterStemmer()
 ExpReg = nltk.RegexpTokenizer('(?:[A-Za-z]\.)+|[A-Za-z]+[\-@]\d+(?:\.\d+)?|\d+[A-Za-z]+|\d+(?:[\.\,]\d+)?%?|\w+(?:[\-/]\w+)*') 
 if st.button("rebuild"):
-    path = "lisa"
+    path = "lisa2"
     build_files(path)
 def read_data(labels,ty,file):
     data = []
@@ -322,5 +322,4 @@ if tp8_querys:
     ax.set_xlabel('Recall')
     ax.set_ylabel('Precision')
     ax.grid(True)
-    ax.legend()
     st.pyplot(fig)
