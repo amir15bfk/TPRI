@@ -299,8 +299,8 @@ if tp8_querys:
     f1 = (2*recall*precision)/(recall+precision)
     st.write(f"f1_score = {f1*100:0.2f} %")
     # curbe-recall-precision
-    recalls = [0]
-    precisions = [1]
+    recalls = []
+    precisions = []
     ris = [i/10 for i in range(11)]
     partinate = 0
     size = 0
@@ -315,11 +315,12 @@ if tp8_querys:
         recalls.append(recall)
     precisions_ri =[]
     for i in range(11):
-        precisions_ri.append(max([precisions[j] for j in range(11) if recalls[j]>=ris[i]]+[0]))
+        precisions_ri.append(max([precisions[j] for j in range(10) if recalls[j]>=ris[i]]+[0]))
     fig,ax = plt.subplots()
     ax.plot(ris,precisions_ri)
     ax.set_title('Recall-Precision Curve')
-    ax.set_xlabel('Recall')
+    ax.set_xlabel('Recall (ri)')
     ax.set_ylabel('Precision')
+    ax.set_ylim([-0.1, 1.1])
     ax.grid(True)
     st.pyplot(fig)
